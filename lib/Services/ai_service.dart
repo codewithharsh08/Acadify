@@ -14,7 +14,6 @@ class AiService {
     int maxTokens = 1500,
     double temperature = 0.7,
   }) async {
-    // Safety check — key must be provided at build time.
     if (_groqKey.isEmpty) {
       throw 'GROQ_API_KEY is not set. '
           'Run with --dart-define=GROQ_API_KEY=your_key_here';
@@ -42,7 +41,8 @@ class AiService {
                   'Never include markdown code blocks or backticks. '
                   'Never use newlines inside JSON string values. '
                   'All property names and string values must be double-quoted. '
-                  'Do not use trailing commas.',
+                  'Do not use trailing commas. '
+                  'Keep all string values on a single line.',
             },
             {'role': 'user', 'content': prompt},
           ],
@@ -61,7 +61,6 @@ class AiService {
       }
 
       if (response.statusCode == 429) {
-        // Rate limit hit — parse wait time from error message.
         int waitSeconds = 5 * (attempt + 1);
         try {
           final errBody = jsonDecode(response.body);
@@ -73,7 +72,6 @@ class AiService {
           }
         } catch (_) {}
 
-        // Switch to fallback model on second attempt.
         if (attempt == 1 && model == _primaryModel) {
           model = _fallbackModel;
           continue;
@@ -138,7 +136,7 @@ class AiService {
 
   static Future<Map<String, dynamic>> callJson(
     String prompt, {
-    int maxTokens = 2000,
+    int maxTokens = 3000,
   }) async {
     final text = await call(prompt, maxTokens: maxTokens, temperature: 0.3);
 
