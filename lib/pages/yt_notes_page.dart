@@ -28,7 +28,6 @@ class _YTNotesPageState extends State<YTNotesPage> {
 
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
-  // Extract YouTube video ID from URL
   String? _extractVideoId(String url) {
     final regexps = [
       RegExp(r'youtube\.com/watch\?v=([a-zA-Z0-9_-]{11})'),
@@ -84,47 +83,64 @@ class _YTNotesPageState extends State<YTNotesPage> {
 
       setState(() => _status = 'Generating summary & key points...');
 
-      // ── CALL 1: summary, key_points, takeaways (light content) ──────────────
+      // ── CALL 1: summary, key_points, takeaways ───────────────────────────────
       final prompt1 =
-          'Generate study notes for a YouTube video. Output ONLY valid JSON, no markdown.\n'
+          'You are a study notes expert. Generate study notes for this YouTube video.\n'
           'Video Title: "$videoTitle"\n'
-          'No newlines inside string values.\n'
-          'Return exactly:\n'
+          'Output ONLY a raw JSON object. No markdown, no backticks, no explanation.\n'
+          'Rules: no newlines inside string values, all strings double-quoted, no trailing commas.\n'
+          'Return exactly this structure:\n'
           '{"title":"$videoTitle",'
-          '"topic":"subject area (3-5 words)",'
-          '"summary":"3 sentence overview of what this video teaches",'
-          '"key_points":["specific point 1","specific point 2","specific point 3","specific point 4","specific point 5","specific point 6"],'
-          '"takeaways":["important lesson 1","important lesson 2","important lesson 3","important lesson 4"]}';
+          '"topic":"specific subject area in 3-5 words based on the video title",'
+          '"summary":"Write 3 detailed sentences explaining what this specific video teaches and why it matters for students.",'
+          '"key_points":['
+          '"specific key concept from this video",'
+          '"another specific concept covered",'
+          '"important method or technique shown",'
+          '"another important point",'
+          '"relevant formula or rule if any",'
+          '"final important concept from this video"'
+          '],'
+          '"takeaways":['
+          '"most important lesson a student should remember",'
+          '"second key insight from this video",'
+          '"practical tip for applying this knowledge",'
+          '"exam or revision tip related to this topic"'
+          ']}';
 
       final raw1 =
-          await AiService.call(prompt1, maxTokens: 1000, temperature: 0.3);
+          await AiService.call(prompt1, maxTokens: 1200, temperature: 0.3);
       final part1 = _parseJsonObject(raw1);
 
       setState(() => _status = 'Generating detailed notes & terms...');
 
       // ── CALL 2: detailed_notes and key_terms ─────────────────────────────────
       final prompt2 =
-          'Generate detailed study notes and key terms for a YouTube video. Output ONLY valid JSON, no markdown.\n'
-          'Video Title: "$videoTitle"\n'
-          'No newlines inside string values. Each content field: 2-3 informative sentences.\n'
-          'Return exactly:\n'
+          'You are an expert academic notes writer. Write comprehensive study notes for: "$videoTitle"\n'
+          'Output ONLY a raw JSON object. No markdown, no backticks, no explanation.\n'
+          'Rules: no newlines inside string values, all strings double-quoted, no trailing commas.\n'
+          'Be VERY specific and detailed about "$videoTitle" — no generic filler text.\n'
+          'Each content field must be 4-5 informative sentences minimum.\n'
+          'Return exactly this structure:\n'
           '{"detailed_notes":['
-          '{"heading":"Introduction & Overview","content":"explain the topic background and importance"},'
-          '{"heading":"Core Concepts","content":"explain the main ideas and theories"},'
-          '{"heading":"Key Methods & Techniques","content":"explain methods, formulas, or steps involved"},'
-          '{"heading":"Practical Applications","content":"explain real-world uses and examples"},'
-          '{"heading":"Conclusion","content":"summarize the most important points"}'
+          '{"heading":"Introduction & Overview","content":"Write 4-5 sentences covering the background, history, importance, and scope of this topic for students studying $videoTitle."},'
+          '{"heading":"Core Concepts","content":"Write 4-5 sentences explaining every main idea, theory, and principle specific to $videoTitle in clear student-friendly language."},'
+          '{"heading":"Key Methods & Techniques","content":"Write 4-5 sentences detailing every formula, method, algorithm, or step-by-step technique covered in $videoTitle."},'
+          '{"heading":"Practical Applications","content":"Write 4-5 sentences on real-world uses, exam scenarios, and industry applications of these concepts from $videoTitle."},'
+          '{"heading":"Common Mistakes & Tips","content":"Write 4-5 sentences on mistakes students make in this topic, how to avoid them, and smart revision tips for exams."},'
+          '{"heading":"Summary & Revision","content":"Write 4-5 sentences summarizing all key points from $videoTitle, important formulas to remember, and what to focus on for exams."}'
           '],'
           '"key_terms":['
-          '{"term":"term1","definition":"1-2 sentence definition"},'
-          '{"term":"term2","definition":"1-2 sentence definition"},'
-          '{"term":"term3","definition":"1-2 sentence definition"},'
-          '{"term":"term4","definition":"1-2 sentence definition"},'
-          '{"term":"term5","definition":"1-2 sentence definition"}'
+          '{"term":"first key term specific to $videoTitle","definition":"detailed 2 sentence definition with a practical example"},'
+          '{"term":"second key term","definition":"detailed 2 sentence definition with a practical example"},'
+          '{"term":"third key term","definition":"detailed 2 sentence definition with a practical example"},'
+          '{"term":"fourth key term","definition":"detailed 2 sentence definition with a practical example"},'
+          '{"term":"fifth key term","definition":"detailed 2 sentence definition with a practical example"},'
+          '{"term":"sixth key term","definition":"detailed 2 sentence definition with a practical example"}'
           ']}';
 
       final raw2 =
-          await AiService.call(prompt2, maxTokens: 1200, temperature: 0.3);
+          await AiService.call(prompt2, maxTokens: 3000, temperature: 0.3);
       final part2 = _parseJsonObject(raw2);
 
       // ── Merge both parts ──────────────────────────────────────────────────────
@@ -138,7 +154,7 @@ class _YTNotesPageState extends State<YTNotesPage> {
             <dynamic>[
               {
                 'heading': 'Overview',
-                'content': 'Please regenerate for detailed notes.'
+                'content': 'Notes could not be fully parsed. Please regenerate.'
               }
             ],
         'key_terms': part2['key_terms'] ?? <dynamic>[],
@@ -222,7 +238,7 @@ class _YTNotesPageState extends State<YTNotesPage> {
       'key_terms': <dynamic>[],
       'takeaways': <dynamic>['Please regenerate notes for full content'],
     };
-    // Try to parse each field individually using regex
+
     void tryStr(String key) {
       final m =
           RegExp('"$key"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"').firstMatch(partial);
@@ -256,10 +272,9 @@ class _YTNotesPageState extends State<YTNotesPage> {
       final title = _generatedNotes!['title'] ?? 'YT Notes';
       final topic = _generatedNotes!['topic'] ?? 'General';
 
-      // Build content string
       final sb = StringBuffer();
       sb.writeln('📺 YouTube Notes\n');
-      sb.writeln(' Summary:\n${_generatedNotes!['summary']}\n');
+      sb.writeln('📝 Summary:\n${_generatedNotes!['summary']}\n');
 
       sb.writeln('🔑 Key Points:');
       for (final point in (_generatedNotes!['key_points'] as List)) {
@@ -280,7 +295,7 @@ class _YTNotesPageState extends State<YTNotesPage> {
       }
       sb.writeln();
 
-      sb.writeln(' Key Takeaways:');
+      sb.writeln('🏆 Key Takeaways:');
       for (final t in (_generatedNotes!['takeaways'] as List)) {
         sb.writeln('• $t');
       }
@@ -303,7 +318,7 @@ class _YTNotesPageState extends State<YTNotesPage> {
       });
 
       setState(() => _isSaving = false);
-      _showSnackBar('Notes saved to Notes Manager! ');
+      _showSnackBar('Notes saved to Notes Manager! ✅');
     } catch (e) {
       setState(() => _isSaving = false);
       _showSnackBar('Error saving: $e', isError: true);
